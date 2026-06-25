@@ -41,6 +41,44 @@ var symbols = func() map[string]string {
 	return m
 }()
 
+// canonicalSymbol maps an ambiguous symbol to its preferred currency, so
+// parsing "$12.50" is deterministic (→ USD, not a random $-currency).
+var canonicalSymbol = map[string]string{
+	"$": "USD",
+	"¥": "JPY",
+	"£": "GBP",
+	"€": "EUR",
+}
+
+// symbolFor finds the currency whose symbol prefixes s, deterministically:
+// longest matching symbol first, with a canonical winner for shared symbols.
+func symbolFor(s string) (code, sym string, ok bool) {
+	best := ""
+	for c, cur := range registry {
+		if cur.Symbol == "" || !strings.HasPrefix(s, cur.Symbol) {
+			continue
+		}
+		switch {
+		case len(cur.Symbol) > len(best):
+			best, code = cur.Symbol, c
+		case len(cur.Symbol) == len(best):
+			// tie on symbol length → prefer the canonical currency, then lexically
+			if canonicalSymbol[cur.Symbol] == c {
+				code = c
+			} else if canonicalSymbol[cur.Symbol] != code && c < code {
+				code = c
+			}
+		}
+	}
+	if best == "" {
+		return "", "", false
+	}
+	if pref, has := canonicalSymbol[best]; has {
+		code = pref
+	}
+	return code, best, true
+}
+
 // Register adds or overrides a currency definition (e.g. a custom token).
 func Register(c Currency) {
 	c.Code = normCur(c.Code)

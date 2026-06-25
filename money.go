@@ -170,14 +170,12 @@ func Parse(s string) (Money, error) {
 			cur, s = fields[1], fields[0]
 		}
 	}
-	// leading symbol
+	// leading symbol — resolve deterministically (a symbol like "$" is shared by
+	// several currencies, so map-range order must not decide the result).
 	if cur == "" {
-		for code, sym := range symbols {
-			if sym != "" && strings.HasPrefix(s, sym) {
-				cur = code
-				s = strings.TrimPrefix(s, sym)
-				break
-			}
+		if code, sym, ok := symbolFor(s); ok {
+			cur = code
+			s = strings.TrimPrefix(s, sym)
 		}
 	}
 	if cur == "" {
